@@ -27,7 +27,6 @@ library(dplyr)
 library(ggplot2)
 library(magrittr)
 library(stringr)
-
 ```
 
 
@@ -52,7 +51,6 @@ object <-
                     by = c("TableNumber", "ImageNumber", "ObjectNumber"))
 
 object %<>% inner_join(image, by = c("TableNumber", "ImageNumber"))
-
 ```
 
 In this table, the measurement columns start with `Nuclei_`, `Cells_`, or 
@@ -106,6 +104,8 @@ Next, lets filter the set of features based on various measures of quality
 Remove features that have near-zero variance. 
 
 ```{r message=FALSE}
+futile.logger::flog.info("start")
+
 object <-
   cytominer::select(
     population = object,
@@ -117,6 +117,8 @@ object <-
 variables <-
   colnames(object) %>%
   str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
+
+futile.logger::flog.info("end")
 ```
 
 Filter based on correlation between features. The morphological features 
@@ -127,6 +129,8 @@ solution to this problem. After excluding the features, no pair of features
 have a correlation greater than `cutoff` indicated below.
 
 ```{r message=FALSE}
+futile.logger::flog.info("start")
+
 object <-
   cytominer::select(
     population = object,
@@ -138,6 +142,8 @@ object <-
 variables <-
   colnames(object) %>%
   str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
+
+futile.logger::flog.info("end")
 ```
 
 # Normalize with reference to control
@@ -154,6 +160,8 @@ from that (in this case, just the mean and s.d.) and then apply it to
 the whole dataset (i.e. the population)
 
 ```{r message=FALSE}
+futile.logger::flog.info("start")
+
 object %<>% collect()
 
 object <-
@@ -163,6 +171,17 @@ object <-
     strata =  c("image_Metadata_Barcode"),
     sample = object %>% filter(image_Metadata_Well == "A01") 
   )
+
+futile.logger::flog.info("end")
+```
+
+In some cases, we may have features that have no variance at all (e.g. Euler 
+number). If these features have not already been removed by this stage, the 
+standardization step will results in all values for that feature being NA (
+because s.d. = 0). Lets remove them:
+
+```{r message=FALSE}
+futile.logger::flog.info("start")
 
 object <-
   cytominer::select(
@@ -175,21 +194,26 @@ variables <-
   colnames(object) %>%
   str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
 
+futile.logger::flog.info("end")
 ```
 
 
-## Transform
+# Transform
 
 We may want to tranform the data so that assumptions we may later make about the 
 data distribution are satisfied (e.g. Gaussianity). The default here is 
 `generalized_log`.
 
 ```{r}
+futile.logger::flog.info("start")
+
 object <-
   cytominer::transform(
     population = object,
     variables = variables
   )
+
+futile.logger::flog.info("end")
 ```
 
 # Summarize measurements per well
@@ -212,6 +236,8 @@ object %>%
 Now let's summarize the data by grouping by well and computing averages. 
 
 ```{r message=FALSE}
+futile.logger::flog.info("start")
+
 profiles <-
   cytominer::aggregate(
     population = object,
@@ -223,6 +249,7 @@ profiles <-
 profiles %<>%
   collect()
 
+futile.logger::flog.info("end")
 ```
 
 How many wells?
