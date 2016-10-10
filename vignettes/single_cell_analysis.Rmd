@@ -15,8 +15,10 @@ morphological profiling experiment.
 The images were analyzed using [CellProfiler](http://cellprofiler.org).
 
 This vignette assumes that 
+
 - the single-cell data `110000106828_sub_1.sqlite` have 
 been created using `ingest` and stored in `~/Downloads`.
+
 - the metadata `metadata.csv` has the columns `WELLTYPE_CODE`, `BARCODE`, and 
 `WELL`, and is stored in `~/Downloads`.
 
@@ -198,7 +200,7 @@ futile.logger::flog.info("end")
 ```
 
 
-## Transform
+# Transform
 
 We may want to tranform the data so that assumptions we may later make about the 
 data distribution are satisfied (e.g. Gaussianity). The default here is 
