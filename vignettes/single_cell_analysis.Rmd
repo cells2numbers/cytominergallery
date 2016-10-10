@@ -99,6 +99,25 @@ object %<>%
   inner_join(metadata)
 ```
 
+Let's filter the data down to a couple of wells and 
+plot thehistogram of a single feature:
+
+```{r fig.width=6, fig.height=5}
+object %>% 
+  filter(image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
+  select(image_Metadata_Type,
+         image_Metadata_Well,
+         Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
+  collect() %>% {
+    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst,
+                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) + 
+      scale_x_log10() +
+      geom_density(alpha = 0.5) + 
+      guides(fill = guide_legend(title = "Well"))
+    }
+
+```
+
 # Feature selection
 
 Next, lets filter the set of features based on various measures of quality 
@@ -219,26 +238,6 @@ futile.logger::flog.info("end")
 ```
 
 # Summarize measurements per well
-
-Before aggregating the data, let's filter it down to a couple of wellw and 
-plot thehistogram of a single feature:
-
-```{r fig.width=6, fig.height=5}
-object %>% 
-  filter(image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
-  select(image_Metadata_Type,
-         image_Metadata_Well,
-         Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
-  collect() %>% {
-    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst,
-                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) + 
-      scale_x_log10() +
-      geom_density(alpha = 0.5) + 
-      guides(fill = guide_legend(title = "Well"))
-    }
-
-```
-
 
 Now let's summarize the data by grouping by well and computing averages. 
 
