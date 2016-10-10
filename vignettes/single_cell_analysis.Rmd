@@ -14,24 +14,28 @@ morphological profiling experiment.
 
 The images were analyzed using [CellProfiler](http://cellprofiler.org).
 
-This vignette assumes that the single-cell data `110000106828_sub_1.sqlite` have 
+This vignette assumes that 
+- the single-cell data `110000106828_sub_1.sqlite` have 
 been created using `ingest` and stored in `~/Downloads`.
+- the metadata `metadata.csv` has the columns `WELLTYPE_CODE`, `BARCODE`, and 
+`WELL`, and is stored in `~/Downloads`.
+
 
 
 ```{r libraries, message=FALSE}
 library(dplyr)
 library(ggplot2)
 library(magrittr)
+library(stringr)
 
 ```
 
 
 # Load data
 
-First, load the data! The data is contained in 4 tables named `Image`, 
+First, load the data. The data is contained in 4 tables named `Image`, 
 `Cytoplasm`, `Cells`, and `Nuclei`. The code below joins these tables to 
 create a single table named `object`. 
-
 
 ```{r load, message=FALSE}
 backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106828_sub_1.sqlite")
@@ -74,12 +78,128 @@ object %>%
   knitr::kable(caption = "No. of cells")
 ```
 
+Let's join the metadata
+
+```{r}
+metadata <- 
+  readr::read_csv("~/Downloads/metadata.csv") %>%
+  select(BARCODE, WELL, WELLTYPE_CODE) %>%
+  rename(image_Metadata_Barcode = BARCODE,
+         image_Metadata_Well = WELL,
+         image_Metadata_Type = WELLTYPE_CODE)
+
+head(metadata)
+
+metadata <- 
+  dplyr::copy_to(db, 
+                 metadata, 
+                 indexes = list("image_Metadata_Type")
+                 )
+object %<>%
+  inner_join(metadata)
+```
+
+# Feature selection
+
+Next, lets filter the set of features based on various measures of quality 
+
+Remove features that have near-zero variance. 
+
+```{r message=FALSE}
+object <-
+  cytominer::select(
+    population = object,
+    variables = variables,
+    sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
+    operation = "variance_threshold"
+  ) 
+
+variables <-
+  colnames(object) %>%
+  str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
+```
+
+Filter based on correlation between features. The morphological features 
+extracted contain several highly correlated groups. We want to to prune the set
+of features, retaining only one feature from each of these highly correlated
+sets. The function `correlation_threshold` provides an approximate (greedy)
+solution to this problem. After excluding the features, no pair of features 
+have a correlation greater than `cutoff` indicated below.
+
+```{r message=FALSE}
+object <-
+  cytominer::select(
+    population = object,
+    variables = variables,
+    sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
+    operation = "correlation_threshold",
+    cutoff = 0.95) 
+
+variables <-
+  colnames(object) %>%
+  str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
+```
+
+# Normalize with reference to control
+
+We need to normalize the data so that
+
+- features are on the same scale
+
+- plate-to-plate variation is reduced
+
+The default for doing this is `standardization`. Here, we take all the cells
+from control wells in the experiment and compute normalizations parameters 
+from that (in this case, just the mean and s.d.) and then apply it to 
+the whole dataset (i.e. the population)
+
+```{r message=FALSE}
+object %<>% collect()
+
+object <-
+  cytominer::normalize(
+    population = object,
+    variables = variables,
+    strata =  c("image_Metadata_Barcode"),
+    sample = object %>% filter(image_Metadata_Well == "A01") 
+  )
+
+object <-
+  cytominer::select(
+      population = object,
+      variables = variables,
+      operation = "drop_na_columns"
+  )
+
+variables <-
+  colnames(object) %>%
+  str_subset("^Nuclei_|^Cells_|^Cytoplasm_")
+
+```
+
+
+## Transform
+
+We may want to tranform the data so that assumptions we may later make about the 
+data distribution are satisfied (e.g. Gaussianity). The default here is 
+`generalized_log`.
+
+```{r}
+object <-
+  cytominer::transform(
+    population = object,
+    variables = variables
+  )
+```
+
+# Summarize measurements per well
+
 Before aggregating the data, let's filter it down to one well and plot the 
 histogram of a single feature:
 
 ```{r fig.width=5, fig.height=5}
 object %>% 
-  filter(Image_Metadata_Well == "A04") %>%
+  filter(image_Metadata_Well == "A01") %>%
   select(Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
   collect() %>% {
     ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst)) + 
@@ -88,7 +208,6 @@ object %>%
 
 ```
 
-# Summarize measurements per well
 
 Now let's summarize the data by grouping by well and computing averages. 
 
@@ -97,7 +216,7 @@ profiles <-
   cytominer::aggregate(
     population = object,
     variables = variables,
-    strata = c("Image_Metadata_Barcode", "Image_Metadata_Well"),
+    strata = c("image_Metadata_Barcode", "image_Metadata_Well"),
     operation = "mean"
   )
 
@@ -114,11 +233,12 @@ profiles %>%
   knitr::kable(caption = "No. of wells")
 ```
 
+
 Let's plot the relationship between a pair of variables from this summarized data
 
 ```{r fig.width=6, fig.height=5, message=FALSE}
 p <- 
-  ggplot(profiles, aes(Cells_AreaShape_Area, Nuclei_AreaShape_Area)) + 
+  ggplot(profiles, aes(Cells_Intensity_IntegratedIntensity_Hoechst, Nuclei_AreaShape_Area)) + 
   geom_point()
 
 print(p)
