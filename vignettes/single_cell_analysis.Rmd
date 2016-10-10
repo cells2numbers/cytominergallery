@@ -78,7 +78,7 @@ object %>%
 
 Let's join the metadata
 
-```{r}
+```{r message=FALSE}
 metadata <- 
   readr::read_csv("~/Downloads/metadata.csv") %>%
   select(BARCODE, WELL, WELLTYPE_CODE) %>%
