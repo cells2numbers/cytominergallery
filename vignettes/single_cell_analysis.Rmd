@@ -9,23 +9,13 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-This vignette demonstrates how to summarize single-cell data from a
-morphological profiling experiment into treatment "profiles". This dataset is 
-from [(Ljosa 2013)](http://jbx.sagepub.com/content/18/10/1321) and is part of the
-[BBBC021](https://data.broadinstitute.org/bbbc/BBBC021/) dataset:
+This vignette demonstrates how to analyze single-cell data from a
+morphological profiling experiment. 
 
-> "This image set provides a basis for testing image-based profiling methods wrt. to their ability to predict the mechanisms of action of a compendium of drugs. The image set was collected using a typical set of morphological labels and uses a physiologically relevant p53-wildtype breast-cancer model system (MCF-7) and a mechanistically distinct set of targeted and cancer-relevant cytotoxic compounds that induces a broad range of gross and subtle phenotypes."
+The images were analyzed using [CellProfiler](http://cellprofiler.org).
 
-The images were analyzed using [CellProfiler](http://cellprofiler.org). The
-CellProfiler pipelines and complete set of instructions to generate the data
-are provided in [(Ljosa 2013)](http://jbx.sagepub.com/content/18/10/1321).
-
-Here, we analyze the single-cell data to perform a simple operation: 
-summarizing them into per-well measurements by computing averages. This 
-summarized data will later be used to predict mechanism-of-action of the 
-compounds  (see the `predict_moa` vignette.)
-
-This vignette assumes that the single-cell data <https://s3.amazonaws.com/imaging-platform-collaborator/2016_09_09_cytominer_workshop/ljosa_jbiomolscreen_2013.sqlite> have been downloaded into `~/Downloads`.
+This vignette assumes that the single-cell data `110000106828_sub_1.sqlite` have 
+been created using `ingest` and stored in `~/Downloads`.
 
 
 ```{r libraries, message=FALSE}
@@ -44,12 +34,11 @@ create a single table named `object`.
 
 
 ```{r load, message=FALSE}
-
-backend <- file.path(Sys.getenv("HOME"), "Downloads", "ljosa_jbiomolscreen_2013.sqlite")
+backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106828_sub_1.sqlite")
 
 db <- src_sqlite(path = backend)
 
-image <- tbl(src = db, "Image")
+image <- tbl(src = db, "image")
 
 object <-
   tbl(src = db, "Cells") %>%
@@ -90,11 +79,11 @@ histogram of a single feature:
 
 ```{r fig.width=5, fig.height=5}
 object %>% 
-  filter(Image_Metadata_Plate == "Week1_22123" && Image_Metadata_Well == "E04") %>%
-  select(Nuclei_Intensity_IntegratedIntensity_CorrDAPI) %>% 
+  filter(Image_Metadata_Well == "A04") %>%
+  select(Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
   collect() %>% {
-    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_CorrDAPI)) + 
-      geom_histogram(binwidth = 5)
+    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst)) + 
+      geom_histogram(binwidth = .1)
     }
 
 ```
@@ -108,7 +97,7 @@ profiles <-
   cytominer::aggregate(
     population = object,
     variables = variables,
-    strata = c("Image_Metadata_Plate", "Image_Metadata_Well"),
+    strata = c("Image_Metadata_Barcode", "Image_Metadata_Well"),
     operation = "mean"
   )
 
@@ -125,15 +114,12 @@ profiles %>%
   knitr::kable(caption = "No. of wells")
 ```
 
-This data is used in the vignette `predict_moa` to predict the mechanism-of-action
-of compounds. 
-
-Before we move on to that, let's plot the relationship between a pair of variables from this summarized data
+Let's plot the relationship between a pair of variables from this summarized data
 
 ```{r fig.width=6, fig.height=5, message=FALSE}
 p <- 
   ggplot(profiles, aes(Cells_AreaShape_Area, Nuclei_AreaShape_Area)) + 
-  geom_hex()
+  geom_point()
 
 print(p)
 ```
