@@ -16,7 +16,7 @@ The images were analyzed using [CellProfiler](http://cellprofiler.org).
 
 This vignette assumes that 
 
-- the single-cell data `110000106828_sub_1.sqlite` have 
+- the single-cell data `110000106828.sqlite` have 
 been created using `ingest` and stored in `~/Downloads`.
 
 - the metadata `metadata.csv` has the columns `WELLTYPE_CODE`, `BARCODE`, and 
@@ -39,7 +39,7 @@ First, load the data. The data is contained in 4 tables named `Image`,
 create a single table named `object`. 
 
 ```{r load, message=FALSE}
-backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106828_sub_1.sqlite")
+backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106828.sqlite")
 
 db <- src_sqlite(path = backend)
 
@@ -164,7 +164,7 @@ the whole dataset (i.e. the population)
 ```{r message=FALSE}
 futile.logger::flog.info("start")
 
-object %<>% collect()
+object %<>% collect(n = Inf)
 
 object <-
   cytominer::normalize(
@@ -206,7 +206,7 @@ We may want to tranform the data so that assumptions we may later make about the
 data distribution are satisfied (e.g. Gaussianity). The default here is 
 `generalized_log`.
 
-```{r}
+```{r, eval=FALSE}
 futile.logger::flog.info("start")
 
 object <-
@@ -220,16 +220,21 @@ futile.logger::flog.info("end")
 
 # Summarize measurements per well
 
-Before aggregating the data, let's filter it down to one well and plot the 
-histogram of a single feature:
+Before aggregating the data, let's filter it down to a couple of wellw and 
+plot thehistogram of a single feature:
 
-```{r fig.width=5, fig.height=5}
+```{r fig.width=6, fig.height=5}
 object %>% 
-  filter(image_Metadata_Well == "A01") %>%
-  select(Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
+  filter(image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
+  select(image_Metadata_Type,
+         image_Metadata_Well,
+         Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
   collect() %>% {
-    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst)) + 
-      geom_histogram(binwidth = .1)
+    ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst,
+                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) + 
+      scale_x_log10() +
+      geom_density(alpha = 0.5) + 
+      guides(fill = guide_legend(title = "Well"))
     }
 
 ```
