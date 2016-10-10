@@ -198,7 +198,7 @@ futile.logger::flog.info("end")
 ```
 
 
-# Transform
+## Transform
 
 We may want to tranform the data so that assumptions we may later make about the 
 data distribution are satisfied (e.g. Gaussianity). The default here is 
