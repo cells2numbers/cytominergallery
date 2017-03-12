@@ -10,16 +10,16 @@ vignette: >
 ---
 
 This vignette demonstrates how to analyze single-cell data from a
-morphological profiling experiment. 
+morphological profiling experiment.
 
 The images were analyzed using [CellProfiler](http://cellprofiler.org).
 
-This vignette assumes that 
+This vignette assumes that
 
-- the single-cell data `110000106828.sqlite` have 
+- the single-cell data `110000106771.sqlite` have
 been created using `ingest` and stored in `~/Downloads`.
 
-- the metadata `metadata.csv` has the columns `WELLTYPE_CODE`, `BARCODE`, and 
+- the metadata `metadata.csv` has the columns `WELLTYPE_CODE`, `BARCODE`, and
 `WELL`, and is stored in `~/Downloads`.
 
 
@@ -34,12 +34,12 @@ library(stringr)
 
 # Load data
 
-First, load the data. The data is contained in 4 tables named `Image`, 
-`Cytoplasm`, `Cells`, and `Nuclei`. The code below joins these tables to 
-create a single table named `object`. 
+First, load the data. The data is contained in 4 tables named `Image`,
+`Cytoplasm`, `Cells`, and `Nuclei`. The code below joins these tables to
+create a single table named `object`.
 
 ```{r load, message=FALSE}
-backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106828.sqlite")
+backend <- file.path(Sys.getenv("HOME"), "Downloads", "110000106771.sqlite")
 
 db <- src_sqlite(path = backend)
 
@@ -55,8 +55,8 @@ object <-
 object %<>% inner_join(image, by = c("TableNumber", "ImageNumber"))
 ```
 
-In this table, the measurement columns start with `Nuclei_`, `Cells_`, or 
-`Cytoplasm_`. 
+In this table, the measurement columns start with `Nuclei_`, `Cells_`, or
+`Cytoplasm_`.
 
 ```{r}
 variables <-
@@ -73,7 +73,7 @@ print(length(variables))
 How many cells?
 
 ```{r}
-object %>% 
+object %>%
   count() %>%
   knitr::kable(caption = "No. of cells")
 ```
@@ -81,7 +81,7 @@ object %>%
 Let's join the metadata
 
 ```{r message=FALSE}
-metadata <- 
+metadata <-
   readr::read_csv("~/Downloads/metadata.csv") %>%
   select(BARCODE, WELL, WELLTYPE_CODE) %>%
   rename(image_Metadata_Barcode = BARCODE,
@@ -90,29 +90,29 @@ metadata <-
 
 head(metadata)
 
-metadata <- 
-  dplyr::copy_to(db, 
-                 metadata, 
+metadata <-
+  dplyr::copy_to(db,
+                 metadata,
                  indexes = list("image_Metadata_Type")
                  )
 object %<>%
   inner_join(metadata)
 ```
 
-Let's filter the data down to a couple of wells and 
+Let's filter the data down to a couple of wells and
 plot thehistogram of a single feature:
 
 ```{r fig.width=6, fig.height=5}
-object %>% 
+object %>%
   filter(image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
   select(image_Metadata_Type,
          image_Metadata_Well,
-         Nuclei_Intensity_IntegratedIntensity_Hoechst) %>% 
+         Nuclei_Intensity_IntegratedIntensity_Hoechst) %>%
   collect() %>% {
     ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst,
-                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) + 
+                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) +
       scale_x_log10() +
-      geom_density(alpha = 0.5) + 
+      geom_density(alpha = 0.5) +
       guides(fill = guide_legend(title = "Well"))
     }
 
@@ -120,9 +120,9 @@ object %>%
 
 # Feature selection
 
-Next, lets filter the set of features based on various measures of quality 
+Next, lets filter the set of features based on various measures of quality
 
-Remove features that have near-zero variance. 
+Remove features that have near-zero variance.
 
 ```{r message=FALSE}
 futile.logger::flog.info("start")
@@ -133,7 +133,7 @@ object <-
     variables = variables,
     sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
     operation = "variance_threshold"
-  ) 
+  )
 
 variables <-
   colnames(object) %>%
@@ -142,11 +142,11 @@ variables <-
 futile.logger::flog.info("end")
 ```
 
-Filter based on correlation between features. The morphological features 
+Filter based on correlation between features. The morphological features
 extracted contain several highly correlated groups. We want to to prune the set
 of features, retaining only one feature from each of these highly correlated
 sets. The function `correlation_threshold` provides an approximate (greedy)
-solution to this problem. After excluding the features, no pair of features 
+solution to this problem. After excluding the features, no pair of features
 have a correlation greater than `cutoff` indicated below.
 
 ```{r message=FALSE}
@@ -158,7 +158,7 @@ object <-
     variables = variables,
     sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
     operation = "correlation_threshold",
-    cutoff = 0.95) 
+    cutoff = 0.95)
 
 variables <-
   colnames(object) %>%
@@ -176,8 +176,8 @@ We need to normalize the data so that
 - plate-to-plate variation is reduced
 
 The default for doing this is `standardization`. Here, we take all the cells
-from control wells in the experiment and compute normalizations parameters 
-from that (in this case, just the mean and s.d.) and then apply it to 
+from control wells in the experiment and compute normalizations parameters
+from that (in this case, just the mean and s.d.) and then apply it to
 the whole dataset (i.e. the population)
 
 ```{r message=FALSE}
@@ -190,14 +190,14 @@ object <-
     population = object,
     variables = variables,
     strata =  c("image_Metadata_Barcode"),
-    sample = object %>% filter(image_Metadata_Well == "A01") 
+    sample = object %>% filter(image_Metadata_Well == "A01")
   )
 
 futile.logger::flog.info("end")
 ```
 
-In some cases, we may have features that have no variance at all (e.g. Euler 
-number). If these features have not already been removed by this stage, the 
+In some cases, we may have features that have no variance at all (e.g. Euler
+number). If these features have not already been removed by this stage, the
 standardization step will results in all values for that feature being NA (
 because s.d. = 0). Lets remove them:
 
@@ -221,8 +221,8 @@ futile.logger::flog.info("end")
 
 # Transform
 
-We may want to tranform the data so that assumptions we may later make about the 
-data distribution are satisfied (e.g. Gaussianity). The default here is 
+We may want to tranform the data so that assumptions we may later make about the
+data distribution are satisfied (e.g. Gaussianity). The default here is
 `generalized_log`.
 
 ```{r, eval=FALSE}
@@ -239,7 +239,7 @@ futile.logger::flog.info("end")
 
 # Summarize measurements per well
 
-Now let's summarize the data by grouping by well and computing averages. 
+Now let's summarize the data by grouping by well and computing averages.
 
 ```{r message=FALSE}
 futile.logger::flog.info("start")
@@ -261,7 +261,7 @@ futile.logger::flog.info("end")
 How many wells?
 
 ```{r}
-profiles %>% 
+profiles %>%
   count() %>%
   knitr::kable(caption = "No. of wells")
 ```
@@ -270,8 +270,8 @@ profiles %>%
 Let's plot the relationship between a pair of variables from this summarized data
 
 ```{r fig.width=6, fig.height=5, message=FALSE}
-p <- 
-  ggplot(profiles, aes(Cells_Intensity_IntegratedIntensity_Hoechst, Nuclei_AreaShape_Area)) + 
+p <-
+  ggplot(profiles, aes(Cells_Intensity_IntegratedIntensity_Hoechst, Nuclei_AreaShape_Area)) +
   geom_point()
 
 print(p)
