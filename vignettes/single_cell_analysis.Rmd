@@ -84,16 +84,16 @@ Let's join the metadata
 metadata <-
   readr::read_csv("~/Downloads/metadata.csv") %>%
   select(BARCODE, WELL, WELLTYPE_CODE) %>%
-  rename(image_Metadata_Barcode = BARCODE,
-         image_Metadata_Well = WELL,
-         image_Metadata_Type = WELLTYPE_CODE)
+  rename(Image_Metadata_Barcode = BARCODE,
+         Image_Metadata_Well = WELL,
+         Image_Metadata_Type = WELLTYPE_CODE)
 
 head(metadata)
 
 metadata <-
   dplyr::copy_to(db,
                  metadata,
-                 indexes = list("image_Metadata_Type")
+                 indexes = list("Image_Metadata_Type")
                  )
 object %<>%
   inner_join(metadata)
@@ -104,13 +104,13 @@ plot thehistogram of a single feature:
 
 ```{r fig.width=6, fig.height=5}
 object %>%
-  filter(image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
-  select(image_Metadata_Type,
-         image_Metadata_Well,
+  filter(Image_Metadata_Well %in% c("A01", "A24", "A23")) %>%
+  select(Image_Metadata_Type,
+         Image_Metadata_Well,
          Nuclei_Intensity_IntegratedIntensity_Hoechst) %>%
   collect() %>% {
     ggplot(., aes(Nuclei_Intensity_IntegratedIntensity_Hoechst,
-                  fill=interaction(image_Metadata_Type, image_Metadata_Well))) +
+                  fill=interaction(Image_Metadata_Type, Image_Metadata_Well))) +
       scale_x_log10() +
       geom_density(alpha = 0.5) +
       guides(fill = guide_legend(title = "Well"))
@@ -131,7 +131,7 @@ object <-
   cytominer::select(
     population = object,
     variables = variables,
-    sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
+    sample = object %>% filter(Image_Metadata_Well == "A01") %>% collect(),
     operation = "variance_threshold"
   )
 
@@ -156,7 +156,7 @@ object <-
   cytominer::select(
     population = object,
     variables = variables,
-    sample = object %>% filter(image_Metadata_Well == "A01") %>% collect(),
+    sample = object %>% filter(Image_Metadata_Well == "A01") %>% collect(),
     operation = "correlation_threshold",
     cutoff = 0.95)
 
@@ -189,8 +189,8 @@ object <-
   cytominer::normalize(
     population = object,
     variables = variables,
-    strata =  c("image_Metadata_Barcode"),
-    sample = object %>% filter(image_Metadata_Well == "A01")
+    strata =  c("Image_Metadata_Barcode"),
+    sample = object %>% filter(Image_Metadata_Well == "A01")
   )
 
 futile.logger::flog.info("end")
@@ -248,7 +248,7 @@ profiles <-
   cytominer::aggregate(
     population = object,
     variables = variables,
-    strata = c("image_Metadata_Barcode", "image_Metadata_Well"),
+    strata = c("Image_Metadata_Barcode", "Image_Metadata_Well"),
     operation = "mean"
   )
 
